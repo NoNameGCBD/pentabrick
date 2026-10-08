@@ -7,9 +7,9 @@ import { COLOR_COUNT, createModel, countColors, totalBlocks } from './model.js';
 import { puzzleFromModel } from './puzzles.js';
 
 export const DIFFICULTIES = {
-  easy: { label: '쉬움', size: 3, height: 2, colors: 3, minBlocks: 5, maxBlocks: 9, fill: 0.65 },
-  normal: { label: '보통', size: 3, height: 3, colors: 4, minBlocks: 9, maxBlocks: 14, fill: 0.7 },
-  hard: { label: '어려움', size: 4, height: 4, colors: 6, minBlocks: 16, maxBlocks: 26, fill: 0.65 },
+  easy: { label: '쉬움', size: 3, height: 3, colors: 3, minBlocks: 6, maxBlocks: 10, fill: 0.6 },
+  normal: { label: '보통', size: 4, height: 3, colors: 4, minBlocks: 12, maxBlocks: 20, fill: 0.65 },
+  hard: { label: '어려움', size: 5, height: 3, colors: 6, minBlocks: 22, maxBlocks: 36, fill: 0.65 },
 };
 
 const MAX_ATTEMPTS = 1000;
