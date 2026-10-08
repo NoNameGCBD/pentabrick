@@ -1,8 +1,11 @@
-// 3D 화면 바깥의 DOM UI: 평면도 패널, 블록/도구/제출 패널, 상단 상태 표시.
+// 3D 화면 바깥의 DOM UI: 평면도 패널, 문제/블록/도구/제출 패널, 상단 상태 표시.
 
 import { VIEW_NAMES, projectAll, viewsEqual } from '../core/projection.js';
 import { PUZZLES } from '../core/puzzles.js';
-import { state, subscribe, actions, remaining, requiredTotal, usedTotal, elapsedMs } from '../game/state.js';
+import { DIFFICULTIES, encodeSeed } from '../core/generator.js';
+import {
+  SAMPLE_MODE, state, subscribe, actions, isGenerated, remaining, requiredTotal, usedTotal, elapsedMs,
+} from '../game/state.js';
 import { COLOR_INFO } from './colors.js';
 
 const VIEW_LABELS = {
@@ -19,9 +22,18 @@ const TOOLS = [
   ['erase', '지우기', 'E'],
 ];
 
+const MODES = [[SAMPLE_MODE, '샘플'], ...Object.entries(DIFFICULTIES).map(([key, { label }]) => [key, label])];
+
 function formatTime(ms) {
   const seconds = Math.floor(ms / 1000);
   return `${String(Math.floor(seconds / 60)).padStart(2, '0')}:${String(seconds % 60).padStart(2, '0')}`;
+}
+
+/** 상단 바에 보이는 문제 이름. 예: "샘플 2 / 6" 또는 "보통 · 1p0qp" */
+function puzzleLabel() {
+  return isGenerated()
+    ? `${DIFFICULTIES[state.mode].label} · ${encodeSeed(state.puzzle.seed)}`
+    : `샘플 ${state.puzzleIndex + 1} / ${PUZZLES.length}`;
 }
 
 function gridHtml(view) {
@@ -50,6 +62,23 @@ function viewsHtml() {
       </article>`;
   });
   return `<h2>평면도</h2>${cards.join('')}`;
+}
+
+function puzzleSectionHtml() {
+  const modes = MODES.map(([key, label]) => (
+    `<button data-action="mode" data-value="${key}" class="${key === state.mode ? 'is-selected' : ''}">${label}</button>`
+  ));
+  const generated = isGenerated();
+  return `
+    <h2>문제 <small>${puzzleLabel()}</small></h2>
+    <div class="segmented">${modes.join('')}</div>
+    <div class="row">
+      <button data-action="newPuzzle">${generated ? '새 문제' : '다음 샘플'}</button>
+      <button data-action="copyLink" ${generated ? '' : 'disabled'}>링크 복사</button>
+    </div>
+    <p class="muted">${generated
+      ? '같은 링크(난이도와 코드)를 열면 같은 문제가 나옵니다.'
+      : '손으로 만든 문제 6개입니다. 난이도를 고르면 문제가 자동으로 만들어집니다.'}</p>`;
 }
 
 function paletteHtml() {
@@ -101,6 +130,24 @@ function resultHtml() {
     </div>`;
 }
 
+function submitSectionHtml() {
+  const used = usedTotal(), required = requiredTotal();
+  if (state.phase !== 'playing') return resultHtml();
+  const hint = used === required
+    ? '블록을 모두 사용했습니다. 제출할 수 있습니다.'
+    : `블록을 정확히 ${required}개 모두 사용해야 제출할 수 있습니다.`;
+  const generatedNote = isGenerated()
+    ? '<p class="muted">자동 생성 문제는 아직 모두 구현 가능합니다. 불가능 문제 생성은 솔버(4단계)와 함께 추가됩니다.</p>'
+    : '';
+  return `
+    <div class="row">
+      <button class="primary" data-action="submit" ${used === required ? '' : 'disabled'}>정답 제출 <small>±1</small></button>
+      <button class="danger" data-action="impossible">불가능 <small>±2</small></button>
+    </div>
+    <p class="muted">${hint}</p>
+    ${generatedNote}`;
+}
+
 function controlsHtml() {
   const playing = state.phase === 'playing';
   const used = usedTotal(), required = requiredTotal();
@@ -109,6 +156,8 @@ function controlsHtml() {
   ));
 
   return `
+    ${puzzleSectionHtml()}
+
     <h2>블록 <small>${state.showingAnswer ? '정답 모형' : `사용 ${used} / ${required}`}</small></h2>
     ${paletteHtml()}
 
@@ -125,13 +174,7 @@ function controlsHtml() {
     </label>
 
     <h2>제출</h2>
-    ${playing ? `
-      <div class="row">
-        <button class="primary" data-action="submit" ${used === required ? '' : 'disabled'}>정답 제출 <small>±1</small></button>
-        <button class="danger" data-action="impossible">불가능 <small>±2</small></button>
-      </div>
-      <p class="muted">${used === required ? '블록을 모두 사용했습니다. 제출할 수 있습니다.' : `블록을 정확히 ${required}개 모두 사용해야 제출할 수 있습니다.`}</p>
-    ` : resultHtml()}
+    ${submitSectionHtml()}
 
     <h2>조작법</h2>
     <ul class="help">
@@ -140,6 +183,16 @@ function controlsHtml() {
       <li>드래그로 회전, 휠로 확대/축소합니다.</li>
       <li>숫자 1–6으로 색 선택, Ctrl/⌘+Z로 실행 취소.</li>
     </ul>`;
+}
+
+async function copyLink(button) {
+  try {
+    await navigator.clipboard.writeText(location.href);
+    button.textContent = '복사됨';
+  } catch {
+    button.textContent = '복사 실패';
+  }
+  setTimeout(() => { button.textContent = '링크 복사'; }, 1500);
 }
 
 export function initPanels({ onCamera }) {
@@ -153,7 +206,7 @@ export function initPanels({ onCamera }) {
     viewsPanel.innerHTML = viewsHtml();
     controlsPanel.innerHTML = controlsHtml();
     const { size, height } = state.puzzle;
-    statPuzzle.textContent = `${state.puzzleIndex + 1} / ${PUZZLES.length} (${size}×${size}×${height})`;
+    statPuzzle.textContent = `${puzzleLabel()} (${size}×${size}×${height})`;
     statScore.textContent = state.score;
     statTime.textContent = formatTime(elapsedMs());
   }
@@ -164,7 +217,9 @@ export function initPanels({ onCamera }) {
     const { action, value } = button.dataset;
     if (action === 'color') actions.setColor(Number(value));
     else if (action === 'tool') actions.setTool(value);
+    else if (action === 'mode') actions.setMode(value);
     else if (action === 'impossible') actions.declareImpossible();
+    else if (action === 'copyLink') copyLink(button);
     else actions[action]();
   });
 

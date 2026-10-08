@@ -11,6 +11,7 @@ import {
 } from '../src/core/projection.js';
 import { judge, scoreSubmit, scoreImpossible } from '../src/core/judge.js';
 import { PUZZLES, puzzleFromModel } from '../src/core/puzzles.js';
+import { DIFFICULTIES, generatePuzzle, mulberry32, encodeSeed, decodeSeed } from '../src/core/generator.js';
 
 const R = 1, O = 2, Y = 3, G = 4, B = 5, P = 6, _ = EMPTY;
 
@@ -248,6 +249,53 @@ test('전수 탐색: 3×3 샘플 문제의 가능/불가능 표시가 실제와 
 test('샘플 문제에 가능한 문제와 불가능한 문제가 모두 있다', () => {
   assert(PUZZLES.some((p) => p.solvable) && PUZZLES.some((p) => !p.solvable));
   assert(PUZZLES.filter((p) => !p.solvable).every((p) => p.reason && p.answer === null));
+});
+
+// --- 문제 생성기 ---
+test('난수 생성기는 seed가 같으면 같은 수열을 낸다', () => {
+  const a = mulberry32(42), b = mulberry32(42), c = mulberry32(43);
+  const seqA = [a(), a(), a()], seqB = [b(), b(), b()], seqC = [c(), c(), c()];
+  assertEqual(seqA, seqB);
+  assert(JSON.stringify(seqA) !== JSON.stringify(seqC));
+  assert(seqA.every((v) => v >= 0 && v < 1));
+});
+
+test('seed 코드는 왕복 변환되고 잘못된 코드는 거부된다', () => {
+  for (const seed of [0, 1, 2847193, 0xffffffff]) assertEqual(decodeSeed(encodeSeed(seed)), seed);
+  assertEqual(decodeSeed('zzzzzzzzz'), null);
+  assertEqual(decodeSeed('abc-'), null);
+  assertEqual(decodeSeed(''), null);
+});
+
+test('같은 난이도와 seed면 같은 문제, seed가 다르면 다른 문제', () => {
+  const a = generatePuzzle('normal', 7), b = generatePuzzle('normal', 7), c = generatePuzzle('normal', 8);
+  assertEqual(a.views, b.views);
+  assertEqual(a.counts, b.counts);
+  assert(JSON.stringify(a.views) !== JSON.stringify(c.views));
+  assertEqual(a.id, 'normal-7');
+});
+
+test('생성된 문제는 모든 난이도에서 조건을 만족하고 정답이 판정을 통과한다', () => {
+  for (const [difficulty, options] of Object.entries(DIFFICULTIES)) {
+    for (let seed = 1; seed <= 150; seed++) {
+      const puzzle = generatePuzzle(difficulty, seed);
+      const where = `${difficulty} seed ${seed}`;
+      assert(puzzle.solvable && puzzle.answer, where);
+      assertEqual([puzzle.size, puzzle.height], [options.size, options.height]);
+      const blocks = puzzle.counts.reduce((sum, count) => sum + count, 0);
+      assert(blocks >= options.minBlocks && blocks <= options.maxBlocks, `${where}: 블록 ${blocks}개`);
+      assertEqual(puzzle.counts.filter((count) => count > 0).length, options.colors);
+      assert(puzzle.answer.columns.every((column) => column.length <= options.height), where);
+      assert(puzzle.answer.columns.some((column) => column.length >= 2), `${where}: 한 층짜리`);
+      assert(judge(puzzle.answer, puzzle).correct, where);
+    }
+  }
+});
+
+test('알 수 없는 난이도는 오류', () => {
+  let threw = false;
+  try { generatePuzzle('impossible', 1); } catch { threw = true; }
+  assert(threw);
 });
 
 // --- 결과 출력 ---
