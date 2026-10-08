@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>PentaBrick 프로토타입</title>
+  <link rel="stylesheet" href="./styles.css">
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
+        "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"
+      }
+    }
+  </script>
+</head>
+<body>
+  <header class="topbar">
+    <h1>PentaBrick <span>프로토타입</span></h1>
+    <dl class="stats">
+      <div><dt>문제</dt><dd id="stat-puzzle"></dd></div>
+      <div><dt>점수</dt><dd id="stat-score"></dd></div>
+      <div><dt>시간</dt><dd id="stat-time"></dd></div>
+    </dl>
+  </header>
+
+  <main class="layout">
+    <section class="panel" id="views-panel" aria-label="평면도"></section>
+
+    <section class="stage" aria-label="3D 에디터">
+      <div id="scene"></div>
+      <div class="camera-bar" id="camera-bar">
+        <span>시점</span>
+        <button data-camera="home">기본</button>
+        <button data-camera="top">상</button>
+        <button data-camera="front">전</button>
+        <button data-camera="back">후</button>
+        <button data-camera="left">좌</button>
+        <button data-camera="right">우</button>
+      </div>
+    </section>
+
+    <section class="panel" id="controls-panel" aria-label="조작"></section>
+  </main>
+
+  <script type="module" src="./src/main.js"></script>
+</body>
+</html>
